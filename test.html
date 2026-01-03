@@ -1,0 +1,135 @@
+i want fatch users with full details
+SELECT `id`, `contact_number`, `otp`, `otp_expires_at`, `otp_attempts`, `otp_resend_count`, `last_otp_sent_at`, `is_verified`, `name`, `email`, `dob`, `gender`, `emergency_contact`, `aadhar_number`, `aadhaar_digilocker_client_id`, `aadhar_front`, `aadhar_back`, `pan_number`, `pan_image`, `full_address`, `state`, `city`, `pincode`, `country`, `same_address`, `declaration`, `is_completed`, `bank_name`, `account_number`, `ifsc`, `postal_code`, `password`, `remember_token`, `created_at`, `updated_at`, `last_login_at`, `login_count`, `aadhaar_verified`, `aadhaar_verification_date`, `aadhaar_verified_data`, `pan_verified`, `rc_verified`, `verified_dob`, `verified_gender`, `verified_address`, `verified_pincode`, `verified_state`, `verification_completed_at` FROM `users` WHERE 1
+
+status btn hoga and check aadhar btn hoga jispe click karke new page open hoga wha aadhar ki full details aaygi and downloade pdf excel csv and print ka btn hoga pdf excel csv ye 3no ki file alg hogi controller me nhi hoga code down ka alg se file bnana app/Exports
+
+full details aaygi
+
+
+controller hoga app/Http/Controllers/Website
+
+
+
+view hogi resource/view/Website/User    is folder me file hogi user ki full code correct code
+<td>
+    <a href="{{ route('users.show', $user->id) }}" class="btn btn-sm btn-primary"
+        title="Check Aadhaar Details">
+        <i class="fas fa-id-card"></i> Check Aadhaar
+    </a>
+</td>
+
+
+
+id	type_key	title	subtitle	description	icon	features	is_active	display_order	created_at	updated_at
+1	fleet_owner	Fleet Owner	BUSINESS & OPERATIONS	Manage your fleet, track performance, optimize routes, and grow your business with powerful analytics tools.	ðŸ¢	["Comprehensive Fleet Management","Real-time Driver Analytics","Advanced Revenue Tracking","Route Optimization Engine"]	1	1	10/5/2025 19:04	10/5/2025 19:04
+2	professional_driver	Professional Driver	ON THE ROAD	Get assignments, navigate efficiently, track earnings, and build your driving career with our comprehensive tools.	ðŸ‘¨â€ðŸ’¼	["Get Instant Job Assignments","Real-time Navigation","Track Your Earnings","Build Your Career Profile"]	1	2	10/5/2025 19:04	10/5/2025 19:04
+
+
+
+controller hoga app/Http/Controllers/Website        isme new controller hoga
+
+view hogi resource/view/Website/User    is folder me file hogi user ki full code correct code
+
+add ka page mt dena view ka page dena and edit ka page
+
+@extends('Website.Layout.master')
+
+@section('custom_css')
+    <style>
+    </style>
+@endsection
+
+@section('content')
+<div class="container mt-4">
+    <div id="form-section" class="form-section">
+        <h2 class="section-title">
+            <i class="fas fa-plus-circle me-2"></i>
+            Add New Record
+        </h2>
+        <form id="dataForm">
+            <div class="row">
+                <div class="col-md-6 mb-3">
+                    <label for="firstName" class="form-label">
+                        First Name <span class="required-field">*</span>
+                    </label>
+                    <input type="text" class="form-control" id="firstName" required>
+                </div>
+                <div class="col-md-6 mb-3">
+                    <label for="lastName" class="form-label">
+                        Last Name <span class="required-field">*</span>
+                    </label>
+                    <input type="text" class="form-control" id="lastName" required>
+                </div>
+            </div>
+
+            <div class="d-flex gap-2">
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-save me-2"></i>
+                    Save Record
+                </button>
+                <button type="reset" class="btn btn-warning">
+                    <i class="fas fa-undo me-2"></i>
+                    Reset Form
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+@endsection
+
+@section('custom_js')
+
+@endsection
+
+
+
+
+id	name	description	is_active	sort_order	created_at	updated_at
+1	Open Truck	Standard open truck for general cargo	1	1	9/24/2025 1:25	9/24/2025 1:25
+2	Container	Closed container truck for secure transport	1	2	9/24/2025 1:25	9/24/2025 1:25
+
+
+i want controller full code with view file
+
+
+id	name	description	price	duration_type	features	is_popular	is_active	button_text	button_color	contact_info	sort_order	created_at	updated_at
+1	Advanced Plan	Perfect for growing businesses with advanced features	299	monthly	["Unlimited product listings","Advanced analytics dashboard","Priority customer support","Custom branding options","API access","Multi-location support","Advanced reporting","Integration with major platforms"]	1	1	Choose Advanced Plan	#4CAF50	NULL	1	9/23/2025 22:22	9/23/2025 22:22
+2	Custom Plan	Tailored solutions for enterprise businesses	0	monthly	["Tailored to your needs","Custom booking limits","Enterprise-grade tracking","Dedicated account manager","Custom integrations","Advanced analytics","White-label solutions","API access","Custom reporting","SLA guarantees"]	0	1	Contact Sales	#9C27B0	sales@yourcompany.com	2	9/23/2025 22:22	9/23/2025 22:22
+3	Starter Plan	Great for small businesses just getting started	99	monthly	["Up to 50 product listings","Basic analytics","Email support","Standard reporting","Mobile app access","Basic integrations"]	0	1	Choose Starter Plan	#2196F3	NULL	3	9/23/2025 22:22	9/23/2025 22:22
+
+
+i want controller full code with view file
+
+id	user_id	plan_id	plan_name	price_paid	duration_type	selected_features	starts_at	expires_at	status	created_at	updated_at
+4	41	3	Starter Plan	99	monthly	["Up to 50 product listings","Basic analytics","Email support","Standard reporting","Mobile app access","Basic integrations"]	10/6/2025 0:37	11/5/2025 0:37	active	10/6/2025 0:37	10/6/2025 0:37
+
+i want controller full code with view file
+
+http://localhost:8000/users/43 view user ka btn hoga ospe click karke is page pr redirect hoga oski profile aa jaygi full code correct code
+
+
+
+id	name	price_per_km	distance_from	distance_to	minimum_charge	description	is_active	sort_order	created_at	updated_at
+1	Local Delivery	8	0	25	200	Local city delivery	1	1	9/24/2025 1:25	9/24/2025 1:25
+2	Short Distance	12	25	100	500	Short distance transport	1	2	9/24/2025 1:25	9/24/2025 1:25
+3	Medium Distance	15	100	500	1500	Medium distance transport	1	3	9/24/2025 1:25	9/24/2025 1:25
+4	Long Distance	18	500	NULL	5000	Long distance transport	1	4	9/24/2025 1:25	9/24/2025 1:25
+
+
+i want full code
+
+
+
+SELECT `id`, `booking_id`, `vendor_id`, `status`, `sent_at`, `expires_at`, `responded_at`, `sequence_number`, `created_at`, `updated_at` FROM `booking_requests` WHERE 1
+
+i want fatch booking request
+all
+only fatch data
+full code
+
+
+SELECT `id`, `truck_type_id`, `length`, `length_unit`, `tyre_count`, `height`, `height_unit`, `max_weight`, `is_active`, `created_at`, `updated_at` FROM `truck_specifications` WHERE 1
+SELECT `id`, `name`, `description`, `is_active`, `sort_order`, `created_at`, `updated_at` FROM `truck_types` WHERE 1
+
+i want fatch data add data crate delete add
+full code correct code

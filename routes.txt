@@ -1,0 +1,494 @@
+vichle categris table all ready hai
+i want jab ye feild hai toh inhe mt lo and
+
+abhi ho ye rha hai ki booking ho rhi hai but i want booking me jo jo select kiya hai jese container and ya open truck select ho gya hai fir tun input me hoga oske uper ke all truck aaynge and fir jo us location pr availbale hogi vichele wo aaynge onke according filter hoga wahi truck aaynge 30 km ki range ke all vichle aaynge fir wo vichele select hoga then os vichle ka price jayga next page pr os page ki image di hai mene check kr lena wo jo price aayga wo editable hoga and then ask ki payment kese karoge pickup location pr ya drop location pr then booking complete ho jaygi
+SELECT `id`, `category_id`, `model_name`, `vehicle_type_desc`, `body_length`, `body_width`, `body_height`, `carry_capacity_kgs`, `carry_capacity_tons`, `is_active`, `display_order`, `created_at`, `updated_at` FROM `vehicle_models` WHERE 1
+
+SELECT `id`, `user_type_id`, `vehicle_category_id`, `vehicle_model_id`, `contact_number`, `otp`, `otp_expires_at`, `otp_attempts`, `otp_resend_count`, `last_otp_sent_at`, `is_verified`, `name`, `email`, `dob`, `gender`, `emergency_contact`, `aadhar_number`, `aadhar_front`, `aadhar_back`, `pan_number`, `pan_image`, `rc_number`, `rc_image`, `rc_verified_data`, `rc_verification_date`, `rc_verified`, `dl_number`, `dl_image`, `dl_verified_data`, `dl_verification_date`, `dl_verified`, `full_address`, `state`, `city`, `pincode`, `country`, `same_address`, `bank_name`, `account_number`, `ifsc`, `postal_code`, `declaration`, `is_completed`, `password`, `remember_token`, `last_login_at`, `login_count`, `created_at`, `updated_at`, `login_otp`, `login_otp_expires_at`, `login_attempts`, `failed_login_attempts`, `last_login_attempt`, `last_logout_at`, `vehicle_registration_number`, `vehicle_type`, `vehicle_brand_model`, `vehicle_length`, `vehicle_length_unit`, `vehicle_tyre_count`, `weight_capacity`, `weight_unit`, `vehicle_image`, `vehicle_rc_document`, `vehicle_insurance_document`, `vehicle_listed`, `vehicle_status`, `vehicle_rejection_reason`, `vehicle_approved_at`, `vehicle_listed_at`, `availability_status`, `last_in_time`, `last_out_time`, `current_latitude`, `current_longitude`, `current_location`, `is_available_for_booking` FROM `vendors` WHERE 1
+
+i want controller code and jo jo feild ya table add hogi wo with cammand i want controller code complete controller code
+GOOGLE_MAPS_API_KEY=AIzaSyDnrWUIvxphrz5qBWOyQX8SpOfG8LIlXdA
+
+
+
+<?php
+// app/Http/Controllers/Api/TruckBookingController.php
+
+
+namespace App\Http\Controllers\Api;
+
+
+use App\Models\User;
+use App\Models\Vendor;
+use App\Models\Material;
+use App\Models\TruckType;
+use App\Models\TruckBooking;
+use Illuminate\Http\Request;
+use Illuminate\Http\JsonResponse;
+use App\Models\TruckSpecification;
+use Illuminate\Support\Facades\DB;
+use App\Services\GoogleMapsService;
+use Illuminate\Support\Facades\Log;
+use App\Http\Controllers\Controller;
+use App\Services\TruckPricingService;
+use Illuminate\Support\Facades\Validator;
+
+
+class TruckBookingController extends Controller
+{
+    private $googleMapsService;
+    private $pricingService;
+   
+    public function __construct()
+    {
+        $this->googleMapsService = new GoogleMapsService();
+        $this->pricingService = new TruckPricingService();
+    }
+
+
+    // ✅ GET FORM DATA (Materials, Truck Types, Specifications)
+    public function getFormData(): JsonResponse
+    {
+        try {
+            $materials = Material::active()->ordered()->get();
+
+
+            $truckTypes = TruckType::active()
+                ->with(['specifications' => function($query) {
+                    $query->where('is_active', true)->orderBy('length');
+                }])
+                ->orderBy('sort_order')
+                ->get();
+
+
+            // Flatten specifications for easier access
+            $specifications = TruckSpecification::with('truckType')
+                ->where('is_active', true)
+                ->orderBy('length')
+                ->get()
+                ->map(function ($spec) {
+                    return [
+                        'id' => $spec->id,
+                        'truck_type_id' => $spec->truck_type_id,
+                        'truck_type_name' => $spec->truckType->name,
+                        'length' => $spec->length,
+                        'length_text' => $spec->length_text,
+                        'tyre_count' => $spec->tyre_count,
+                        'tyre_text' => $spec->tyre_text,
+                        'height' => $spec->height,
+                        'height_text' => $spec->height_text,
+                        'max_weight' => $spec->max_weight,
+                        'base_price_per_km' => $spec->base_price_per_km
+                    ];
+                });
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Form data retrieved successfully',
+                'data' => [
+                    'materials' => $materials,
+                    'truck_types' => $truckTypes,
+                    'specifications' => $specifications,
+                    'length_options' => ['22.0', '24.0', '25.0', '28.0'],
+                    'tyre_options' => [5, 10],
+                    'height_options' => ['5.0', '6.5', '9.0', '9.5'],
+                    'weight_limits' => [
+                        'min' => 0.1,
+                        'max' => 50.0,
+                        'warning_limit' => 15.0
+                    ]
+                ]
+            ]);
+
+
+        } catch (\Exception $e) {
+            Log::error('Get Form Data Error', [
+                'error' => $e->getMessage()
+            ]);
+
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve form data: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    // ✅ CALCULATE DISTANCE AND PRICE
+    public function calculatePrice(Request $request): JsonResponse
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'pickup_latitude' => 'required|numeric|between:-90,90',
+                'pickup_longitude' => 'required|numeric|between:-180,180',
+                'drop_latitude' => 'required|numeric|between:-90,90',
+                'drop_longitude' => 'required|numeric|between:-180,180',
+                'material_id' => 'required|exists:materials,id',
+                'truck_specification_id' => 'required|exists:truck_specifications,id',
+                'material_weight' => 'required|numeric|min:0.1|max:50',
+                'pickup_address' => 'nullable|string',
+                'drop_address' => 'nullable|string'
+            ]);
+
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+
+            // Calculate distance using Google Maps
+            $distanceResult = $this->googleMapsService->calculateDistance(
+                $request->pickup_latitude,
+                $request->pickup_longitude,
+                $request->drop_latitude,
+                $request->drop_longitude
+            );
+
+
+            if (!$distanceResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to calculate distance between locations',
+                    'error' => $distanceResult['message']
+                ], 400);
+            }
+
+
+            // Calculate price
+            $priceResult = $this->pricingService->calculatePrice(
+                $distanceResult['distance_km'],
+                $request->material_weight,
+                $request->truck_specification_id,
+                $request->material_id
+            );
+
+
+            if (!$priceResult['success']) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unable to calculate price',
+                    'error' => $priceResult['message']
+                ], 400);
+            }
+
+
+            // Get additional details
+            $material = Material::find($request->material_id);
+            $truckSpec = TruckSpecification::with('truckType')->find($request->truck_specification_id);
+
+
+            // Get addresses if not provided
+            $pickupAddress = $request->pickup_address;
+            $dropAddress = $request->drop_address;
+
+
+            if (!$pickupAddress) {
+                $pickupResult = $this->googleMapsService->getAddressFromCoordinates(
+                    $request->pickup_latitude,
+                    $request->pickup_longitude
+                );
+                $pickupAddress = $pickupResult['success'] ? $pickupResult['address'] : 'Address not found';
+            }
+
+
+            if (!$dropAddress) {
+                $dropResult = $this->googleMapsService->getAddressFromCoordinates(
+                    $request->drop_latitude,
+                    $request->drop_longitude
+                );
+                $dropAddress = $dropResult['success'] ? $dropResult['address'] : 'Address not found';
+            }
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Price calculated successfully',
+                'data' => [
+                    'distance' => [
+                        'km' => $distanceResult['distance_km'],
+                        'text' => $distanceResult['distance_text'],
+                        'duration_text' => $distanceResult['duration_text'],
+                        'duration_minutes' => $distanceResult['duration_minutes']
+                    ],
+                    'pricing' => [
+                        'estimated_price' => $priceResult['estimated_price'],
+                        'currency' => $priceResult['currency'],
+                        'breakdown' => $priceResult['breakdown']
+                    ],
+                    'booking_details' => [
+                        'pickup_address' => $pickupAddress,
+                        'drop_address' => $dropAddress,
+                        'material' => [
+                            'id' => $material->id,
+                            'name' => $material->name,
+                            'weight' => $request->material_weight . ' tons'
+                        ],
+                        'truck' => [
+                            'specification_id' => $truckSpec->id,
+                            'type' => $truckSpec->truckType->name,
+                            'length' => $truckSpec->length_text,
+                            'tyre_count' => $truckSpec->tyre_text,
+                            'height' => $truckSpec->height_text,
+                            'max_weight' => $truckSpec->max_weight . ' tons'
+                        ]
+                    ],
+                    'weight_warning' => $request->material_weight > 15.0 ?
+                        'Material weight exceeds standard limit of 15 tons. Additional charges may apply.' : null
+                ]
+            ]);
+
+
+        } catch (\Exception $e) {
+            Log::error('Calculate Price Error', [
+                'error' => $e->getMessage(),
+                'request_data' => $request->all()
+            ]);
+
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Price calculation failed: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    // ✅ CREATE TRUCK BOOKING
+    public function createBooking(Request $request): JsonResponse
+    {
+        try {
+            // ✅ Token validation for users table
+            $authHeader = $request->header('Authorization');
+            if (!$authHeader || !str_contains($authHeader, 'Bearer ')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authorization token required'
+                ], 401);
+            }
+
+
+            $token = str_replace('Bearer ', '', $authHeader);
+            $decodedToken = base64_decode($token);
+            $tokenParts = explode(':', $decodedToken);
+
+
+            if (count($tokenParts) < 3) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid token format'
+                ], 401);
+            }
+
+
+            $userId = $tokenParts[0];
+            $user = User::find($userId); // ✅ CHANGED: User model
+
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+
+            // Validation
+            $validator = Validator::make($request->all(), [
+                'pickup_address' => 'required|string',
+                'pickup_latitude' => 'required|numeric|between:-90,90',
+                'pickup_longitude' => 'required|numeric|between:-180,180',
+                'drop_address' => 'required|string',
+                'drop_latitude' => 'required|numeric|between:-90,90',
+                'drop_longitude' => 'required|numeric|between:-180,180',
+                'material_id' => 'required|exists:materials,id',
+                'truck_specification_id' => 'required|exists:truck_specifications,id',
+                'material_weight' => 'required|numeric|min:0.1|max:50',
+                'distance_km' => 'required|numeric|min:0.1',
+                'estimated_price' => 'required|numeric|min:1',
+                'pickup_datetime' => 'nullable|date|after:now',
+                'special_instructions' => 'nullable|string|max:1000'
+            ]);
+
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 400);
+            }
+
+
+            DB::beginTransaction();
+
+
+            try {
+                // Get related data
+                $material = Material::findOrFail($request->material_id);
+                $truckSpec = TruckSpecification::with('truckType')->findOrFail($request->truck_specification_id);
+
+
+                // ✅ Recalculate price using ONLY pricing_rules
+                $priceResult = $this->pricingService->calculatePrice(
+                    $request->distance_km,
+                    $request->material_weight,
+                    $request->truck_specification_id,
+                    $request->material_id
+                );
+
+
+                // Create booking
+                $booking = TruckBooking::create([
+                    'user_id' => $userId,
+                    'pickup_address' => $request->pickup_address,
+                    'pickup_latitude' => $request->pickup_latitude,
+                    'pickup_longitude' => $request->pickup_longitude,
+                    'drop_address' => $request->drop_address,
+                    'drop_latitude' => $request->drop_latitude,
+                    'drop_longitude' => $request->drop_longitude,
+                    'material_id' => $material->id,
+                    'material_name' => $material->name,
+                    'truck_type_id' => $truckSpec->truck_type_id,
+                    'truck_type_name' => $truckSpec->truckType->name,
+                    'truck_specification_id' => $truckSpec->id,
+                    'material_weight' => $request->material_weight,
+                    'truck_length' => $truckSpec->length,
+                    'tyre_count' => $truckSpec->tyre_count,
+                    'truck_height' => $truckSpec->height,
+                    'distance_km' => $request->distance_km,
+                    'price_per_km' => $priceResult['success'] ? $priceResult['price_per_km'] : 10.0, // ✅ Store rate used
+                    'estimated_price' => $priceResult['success'] ? $priceResult['estimated_price'] : $request->estimated_price,
+                    'price_breakdown' => $priceResult['success'] ? $priceResult['breakdown'] : null,
+                    'pickup_datetime' => $request->pickup_datetime,
+                    'special_instructions' => $request->special_instructions
+                ]);
+
+
+                DB::commit();
+
+
+                Log::info('Truck booking created', [
+                    'booking_id' => $booking->booking_id,
+                    'user_id' => $userId,
+                    'estimated_price' => $booking->estimated_price,
+                    'price_per_km' => $booking->price_per_km
+                ]);
+
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Truck booking created successfully',
+                    'data' => [
+                        'booking' => [
+                            'id' => $booking->id,
+                            'booking_id' => $booking->booking_id,
+                            'pickup_address' => $booking->pickup_address,
+                            'drop_address' => $booking->drop_address,
+                            'material_name' => $booking->material_name,
+                            'material_weight' => $booking->material_weight . ' tons',
+                            'truck_type' => $booking->truck_type_name,
+                            'truck_length' => $booking->truck_length . ' ft',
+                            'tyre_count' => $booking->tyre_count . ' tyre',
+                            'distance_km' => $booking->distance_km,
+                            'price_per_km' => $booking->price_per_km, // ✅ Show rate used
+                            'estimated_price' => $booking->estimated_price,
+                            'status' => $booking->status,
+                            'pickup_datetime' => $booking->pickup_datetime,
+                            'created_at' => $booking->created_at
+                        ]
+                    ]
+                ]);
+
+
+            } catch (\Exception $e) {
+                DB::rollback();
+                throw $e;
+            }
+
+
+        } catch (\Exception $e) {
+            Log::error('Create Truck Booking Error', [
+                'user_id' => $userId ?? null,
+                'error' => $e->getMessage(),
+                'line' => $e->getLine()
+            ]);
+
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to create booking: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+
+    // ✅ GET USER'S BOOKINGS
+    public function getUserBookings(Request $request): JsonResponse
+    {
+        try {
+            // Token validation
+            $authHeader = $request->header('Authorization');
+            if (!$authHeader || !str_contains($authHeader, 'Bearer ')) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Authorization token required'
+                ], 401);
+            }
+
+
+            $token = str_replace('Bearer ', '', $authHeader);
+            $decodedToken = base64_decode($token);
+            $tokenParts = explode(':', $decodedToken);
+
+
+            if (count($tokenParts) < 3) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid token format'
+                ], 401);
+            }
+
+
+            $userId = $tokenParts[0];
+
+
+            $bookings = TruckBooking::where('user_id', $userId)
+                ->with(['material', 'truckType', 'truckSpecification'])
+                ->orderBy('created_at', 'desc')
+                ->paginate(10);
+
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Bookings retrieved successfully',
+                'data' => [
+                    'bookings' => $bookings->items(),
+                    'pagination' => [
+                        'current_page' => $bookings->currentPage(),
+                        'last_page' => $bookings->lastPage(),
+                        'per_page' => $bookings->perPage(),
+                        'total' => $bookings->total()
+                    ]
+                ]
+            ]);
+
+
+        } catch (\Exception $e) {
+            Log::error('Get User Bookings Error', [
+                'error' => $e->getMessage()
+            ]);
+
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to retrieve bookings: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+}
